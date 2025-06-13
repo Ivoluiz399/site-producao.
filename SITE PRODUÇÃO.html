@@ -39,109 +39,54 @@
 </div>
 
 <script>
-const spreadsheetBaseUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRfWQjxYbB4YwwlUBX-o_uTqw-nY6-mX2P3I0oBijFnn3meRsTr1ndWFQJrRH3zRx7EbJqLIYyfNZtN/gviz/tq?tqx=out:json&sheet=";
+const spreadsheetBaseUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRfWQjxYbB4YwwlUBX-o_uTqw-nY6-mX2P3I0oBijFnn3meRsTr1ndWFQJrRH3zRx7EbJqLIYyfNZtN/gviz/tq?tqx=out:json&gid=";
 
 const sheets = [
-  {name: "DADOS - MONTAGEM E COLAGEM", canvasId: "chartMontagem"},
-  {name: "RESULTADO FAIXA - BOX", canvasId: "chartBox"},
-  {name: "RESULTADO FAIXA - MOLAS E COLCHOES", canvasId: "chartMolas"},
-  {name: "RESULTADO FAIXA - MESA COSTURA", canvasId: "chartMesaCostura"},
-  {name: "RESULTADO ORTOPEDICO", canvasId: "chartOrtopedico"}
+  {gid: "1840217276", canvasId: "chartMontagem", title: "DADOS - MONTAGEM E COLAGEM"},
+  {gid: "1758710632", canvasId: "chartBox", title: "RESULTADO FAIXA - BOX"},
+  {gid: "1339326472", canvasId: "chartMolas", title: "RESULTADO FAIXA - MOLAS E COLCHOES"},
+  {gid: "1572336153", canvasId: "chartMesaCostura", title: "RESULTADO FAIXA - MESA COSTURA"},
+  {gid: "327165079",  canvasId: "chartOrtopedico", title: "RESULTADO ORTOPEDICO"}
 ];
 
-// Variável para guardar os gráficos para atualizar depois
+// Armazenar os gráficos criados para atualizar depois
 let charts = {};
 
-function fetchSheetData(sheetName) {
-  const encodedSheet = encodeURIComponent(sheetName);
-  const url = spreadsheetBaseUrl + encodedSheet;
-
+function fetchSheetData(gid) {
+  const url = spreadsheetBaseUrl + gid;
   return fetch(url)
     .then(response => response.text())
     .then(text => {
-      // O retorno é JSONP, precisa extrair o JSON
       const jsonText = text.substring(text.indexOf('(') + 1, text.lastIndexOf(')'));
       return JSON.parse(jsonText);
     });
 }
 
-function processMontagemData(data) {
-  // Montar dataset: soma quantidade por Montador Principal
+function processData(sheetTitle, data) {
   const rows = data.table.rows;
   const map = new Map();
 
   rows.forEach(row => {
-    const montador = row.c[2]?.v || "Indefinido";
-    const qtd = row.c[4]?.v || 0;
-    map.set(montador, (map.get(montador) || 0) + qtd);
-  });
+    let label = "Indefinido";
+    let qtd = 0;
 
-  return {
-    labels: [...map.keys()],
-    values: [...map.values()]
-  };
-}
-
-function processFaixaBoxData(data) {
-  // Soma quantidade por Costureira
-  const rows = data.table.rows;
-  const map = new Map();
-
-  rows.forEach(row => {
-    const costureira = row.c[1]?.v || "Indefinido";
-    const qtd = row.c[3]?.v || 0;
-    map.set(costureira, (map.get(costureira) || 0) + qtd);
-  });
-
-  return {
-    labels: [...map.keys()],
-    values: [...map.values()]
-  };
-}
-
-function processFaixaMolasData(data) {
-  // Soma quantidade por Costureira
-  const rows = data.table.rows;
-  const map = new Map();
-
-  rows.forEach(row => {
-    const costureira = row.c[1]?.v || "Indefinido";
-    const qtd = row.c[3]?.v || 0;
-    map.set(costureira, (map.get(costureira) || 0) + qtd);
-  });
-
-  return {
-    labels: [...map.keys()],
-    values: [...map.values()]
-  };
-}
-
-function processMesaCosturaData(data) {
-  // Soma quantidade por Costureira
-  const rows = data.table.rows;
-  const map = new Map();
-
-  rows.forEach(row => {
-    const costureira = row.c[1]?.v || "Indefinido";
-    const qtd = row.c[3]?.v || 0;
-    map.set(costureira, (map.get(costureira) || 0) + qtd);
-  });
-
-  return {
-    labels: [...map.keys()],
-    values: [...map.values()]
-  };
-}
-
-function processOrtopedicoData(data) {
-  // Soma quantidade por Montador
-  const rows = data.table.rows;
-  const map = new Map();
-
-  rows.forEach(row => {
-    const montador = row.c[1]?.v || "Indefinido";
-    const qtd = row.c[3]?.v || 0;
-    map.set(montador, (map.get(montador) || 0) + qtd);
+    switch(sheetTitle) {
+      case "DADOS - MONTAGEM E COLAGEM":
+        label = row.c[2]?.v || "Indefinido"; // Montador Principal
+        qtd = row.c[4]?.v || 0;
+        break;
+      case "RESULTADO FAIXA - BOX":
+      case "RESULTADO FAIXA - MOLAS E COLCHOES":
+      case "RESULTADO FAIXA - MESA COSTURA":
+        label = row.c[1]?.v || "Indefinido"; // Costureira
+        qtd = row.c[3]?.v || 0;
+        break;
+      case "RESULTADO ORTOPEDICO":
+        label = row.c[1]?.v || "Indefinido"; // Montador
+        qtd = row.c[3]?.v || 0;
+        break;
+    }
+    map.set(label, (map.get(label) || 0) + qtd);
   });
 
   return {
@@ -188,46 +133,27 @@ function createChart(ctx, labels, values, title) {
       }
     }
   });
+
   charts[ctx.id] = newChart;
   return newChart;
 }
 
 async function loadCharts() {
   try {
-    // DADOS - MONTAGEM E COLAGEM
-    const montagemData = await fetchSheetData("DADOS - MONTAGEM E COLAGEM");
-    const montagemProcessed = processMontagemData(montagemData);
-    createChart(document.getElementById("chartMontagem").getContext("2d"), montagemProcessed.labels, montagemProcessed.values, "Montagem e Colagem");
-
-    // RESULTADO FAIXA - BOX
-    const boxData = await fetchSheetData("RESULTADO FAIXA - BOX");
-    const boxProcessed = processFaixaBoxData(boxData);
-    createChart(document.getElementById("chartBox").getContext("2d"), boxProcessed.labels, boxProcessed.values, "Faixa - Box");
-
-    // RESULTADO FAIXA - MOLAS E COLCHOES
-    const molasData = await fetchSheetData("RESULTADO FAIXA - MOLAS E COLCHOES");
-    const molasProcessed = processFaixaMolasData(molasData);
-    createChart(document.getElementById("chartMolas").getContext("2d"), molasProcessed.labels, molasProcessed.values, "Faixa - Molas e Colchões");
-
-    // RESULTADO FAIXA - MESA COSTURA
-    const mesaData = await fetchSheetData("RESULTADO FAIXA - MESA COSTURA");
-    const mesaProcessed = processMesaCosturaData(mesaData);
-    createChart(document.getElementById("chartMesaCostura").getContext("2d"), mesaProcessed.labels, mesaProcessed.values, "Faixa - Mesa Costura");
-
-    // RESULTADO ORTOPEDICO
-    const ortopedicoData = await fetchSheetData("RESULTADO ORTOPEDICO");
-    const ortopedicoProcessed = processOrtopedicoData(ortopedicoData);
-    createChart(document.getElementById("chartOrtopedico").getContext("2d"), ortopedicoProcessed.labels, ortopedicoProcessed.values, "Resultado Ortopédico");
-
+    for (const sheet of sheets) {
+      const data = await fetchSheetData(sheet.gid);
+      const processed = processData(sheet.title, data);
+      createChart(document.getElementById(sheet.canvasId).getContext("2d"), processed.labels, processed.values, sheet.title);
+    }
   } catch (error) {
     console.error("Erro ao carregar os dados:", error);
   }
 }
 
-// Inicializa a carga
+// Inicializa a carga dos gráficos
 loadCharts();
 
-// Atualiza a cada 5 minutos (300000 ms)
+// Atualiza os gráficos a cada 5 minutos (300000 ms)
 setInterval(loadCharts, 300000);
 
 </script>
